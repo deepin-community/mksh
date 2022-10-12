@@ -1,0 +1,116 @@
+#!/bin/sh
+
+# work around sadt not honouring the latest DEP8
+test -n "$AUTOPKGTEST_TMP" || AUTOPKGTEST_TMP=${ADTTMP:-$TMPDIR}
+
+set -e
+# just to be safe
+test -n "$AUTOPKGTEST_TMP"
+
+script=$(which script 2>/dev/null) || script=
+if test x"$(uname -s)" = x"GNU"; then
+	# script(1) fails on Debian GNU/Hurd in pbuilder
+	script=
+fi
+if test -z "$script"; then
+	if test x"$(uname -s)" = x"Linux"; then
+		echo >&2 "W: no script(1) on GNU/Linux?"
+	fi
+	dotest() {
+		echo "W: no controlling tty"
+		if perl "$AUTOPKGTEST_TMP"/check.pl -T "$AUTOPKGTEST_TMP" \
+		    -U C.UTF-8 -s "$AUTOPKGTEST_TMP"/check.t -p "$shell" \
+		    -C regress:no-ctty,"$cat" -v \
+		    >"$AUTOPKGTEST_TMP"/regress.log 2>&1; then
+			return 0
+		fi
+		return 1
+		# looks weird due to set -e
+	}
+else
+	test -c /dev/tty || echo >&2 "W: /dev/tty missing"
+	test -c /dev/ptmx || echo >&2 "W: /dev/ptmx missing"
+	dotest() {
+		echo >"$AUTOPKGTEST_TMP"/test.wait
+		set +e
+		(cd "$AUTOPKGTEST_TMP"
+		 shell="$shell" cat="$cat" script -c 'echo 255 >regress.out
+			set +e
+			perl check.pl -T "$AUTOPKGTEST_TMP" \
+			    -U C.UTF-8 -s check.t -p "$shell" \
+			    -C "$cat" -v >regress.log 2>&1
+			echo $? >regress.out
+			sleep 1
+			rm -f test.wait')
+		maxwait=0
+		while test -e test.wait; do
+			sleep 1
+			maxwait=$(expr $maxwait + 1)
+			test $maxwait -lt 900 || break
+		done
+		dotestrv=$(cat "$AUTOPKGTEST_TMP"/regress.out 2>/dev/null) || \
+		    dotestrv=enoent
+		case $dotestrv in
+		(0)
+			dotestrv=0
+			;;
+		(*)
+			echo "W: check.t failed: $dotestrv"
+			dotestrv=1
+			;;
+		esac
+		set -e
+		return $dotestrv
+	}
+fi
+
+cp /usr/share/doc/mksh/check.* "$AUTOPKGTEST_TMP/"
+cp /usr/share/doc/mksh/testdata.* "$AUTOPKGTEST_TMP/"
+for x in "$AUTOPKGTEST_TMP/"*.gz; do
+	test -e "$x" || continue
+	gzip -d "$x"
+done
+
+rv=0
+bad() {
+	echo "E: $*"
+	rv=1
+}
+
+for fn in "$AUTOPKGTEST_TMP"/testdata.full*; do
+	what=${fn#"$AUTOPKGTEST_TMP"/testdata.}
+	echo "I: testing $what"
+	test -s "$fn" || {
+		# deliberately catches testdata.full* matching nothing
+		echo >&2 "E: $fn empty"
+		exit 1
+	}
+	cat= shell=/bin/false skip=
+	. "$fn"
+	if test x"$skip" = x"1"; then
+		echo "W: skipping $shell"
+		continue
+	elif test x"$skip" != x"0"; then
+		bad "$what: testdata file error"
+	fi
+	:>"$AUTOPKGTEST_TMP"/regress.log
+	if dotest; then
+		if grep '^Total failed: 0$' "$AUTOPKGTEST_TMP"/regress.log \
+		    >/dev/null; then
+			echo "I: $what: regress passed"
+		else
+			bad "$what: regress did not pass"
+			sed 's/^/N: /' <"$AUTOPKGTEST_TMP"/regress.log
+		fi
+	else
+		bad "$what: regress failed"
+		sed 's/^/N: /' <"$AUTOPKGTEST_TMP"/regress.log
+	fi
+done
+
+if test x"$rv" = x"0"; then
+	echo "I: success"
+	exit 0
+fi
+echo >&2 "E: there were failures"
+exit $rv

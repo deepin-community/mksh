@@ -1,0 +1,5 @@
+bin/lksh bin/rlksh
+bin/mksh bin/rmksh
+usr/share/man/man1/lksh.1 usr/share/man/man1/rlksh.1
+usr/share/man/man1/mksh.1 usr/share/man/man1/mksh-static.1
+usr/share/man/man1/mksh.1 usr/share/man/man1/rmksh.1

@@ -1,0 +1,17 @@
+# work around #953811
+mksh source: uses-deprecated-adttmp debian/tests/mtests (line 4)
+mksh source: uses-deprecated-adttmp debian/tests/regress-dynamic (line 4)
+mksh source: uses-deprecated-adttmp debian/tests/regress-legacy (line 4)
+mksh source: uses-deprecated-adttmp debian/tests/regress-static (line 4)
+
+# can’t use https because OpenSSL maintainer disabled TLSv1.0
+mksh source: debian-watch-uses-insecure-uri http://www.mirbsd.org/MirOS/dist/mir/mksh/ (line *)
+
+# lintian tries being cute…
+mksh source: cute-field
+
+# there is only gzsig, not pgp
+mksh source: debian-watch-does-not-check-gpg-signature
+
+# thanks, but I prefer human-readable over machine-readable
+mksh source: no-dep5-copyright

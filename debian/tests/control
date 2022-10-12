@@ -1,0 +1,14 @@
+Tests: mtests
+Depends: @, perl-modules
+Restrictions: superficial
+
+Tests: regress-dynamic
+Depends: @, ed, perl-modules
+
+Tests: regress-legacy
+Depends: @, ed, perl-modules
+Restrictions: superficial
+
+Tests: regress-static
+Depends: @, ed, perl-modules
+Restrictions: superficial
